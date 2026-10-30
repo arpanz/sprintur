@@ -6,28 +6,37 @@ import 'package:sprintur/app/providers.dart';
 import 'package:sprintur/app/theme.dart';
 import 'package:sprintur/audio/cue_player.dart';
 import 'package:sprintur/data/database.dart';
+import 'package:sprintur/data/settings.dart';
 import 'package:sprintur/main.dart';
 import 'package:sprintur/screens/summary_screen.dart';
 import 'package:sprintur/timer/session_engine.dart';
 import 'package:sprintur/timer/session_summary.dart';
 import 'package:sprintur/timer/workout.dart';
+import 'package:sprintur/widgets/common.dart';
 
 class _SilentCuePlayer extends CuePlayer {
+  final previews = <BeepStyle>[];
+
   @override
   void play(Cue cue) {}
+
+  @override
+  Future<void> preview(BeepStyle preview) async => previews.add(preview);
 }
+
+late _SilentCuePlayer _player;
 
 late AppDatabase _db;
 
 Widget _scope(Widget child) => ProviderScope(
   overrides: [
-    cuePlayerProvider.overrideWithValue(_SilentCuePlayer()),
+    cuePlayerProvider.overrideWithValue(_player),
     databaseProvider.overrideWithValue(_db),
   ],
   child: child,
 );
 
-Widget _app() => _scope(const SprinturApp());
+Widget _app() => _scope(const SprinturApp(autoBackup: false));
 
 Future<void> _phone(WidgetTester tester) async {
   tester.view.physicalSize = const Size(1170, 2532);
@@ -42,6 +51,17 @@ Future<void> _finish(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 1));
 }
 
+/// Lets drift finish writes started by a tap and deliver the stream updates.
+Future<void> _settleDb(WidgetTester tester) async {
+  for (var i = 0; i < 5; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await tester.pump();
+  }
+  await tester.pumpAndSettle();
+}
+
 SessionSummary _summary(List<double?> times, {DateTime? at}) => SessionSummary(
   workout: Workout.presets.first,
   results: [
@@ -51,7 +71,11 @@ SessionSummary _summary(List<double?> times, {DateTime? at}) => SessionSummary(
 );
 
 void main() {
-  setUp(() => _db = AppDatabase(NativeDatabase.memory()));
+  setUp(() async {
+    _player = _SilentCuePlayer();
+    _db = AppDatabase(NativeDatabase.memory());
+    await _db.setPref(AppSettings.keyOnboarded, 'true');
+  });
   tearDown(() => _db.close());
 
   testWidgets('home shows the next workout and switches presets', (
@@ -178,6 +202,50 @@ void main() {
 
     final workouts = (await tester.runAsync(() => _db.watchWorkouts().first))!;
     expect(workouts.single.$2.name, 'Hill sprints');
+    await _finish(tester);
+  });
+
+  testWidgets('first run picks a beep sound, then shows the app', (
+    tester,
+  ) async {
+    await tester.runAsync(() => _db.setPref(AppSettings.keyOnboarded, null));
+    await _phone(tester);
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+
+    expect(find.text('RUN THE\nCLOCK.'), findsOneWidget);
+    expect(find.text('READY TO FLY?'), findsNothing);
+
+    await tester.tap(find.text('Whistle'));
+    await tester.pumpAndSettle();
+    expect(_player.previews, [BeepStyle.whistle]);
+
+    await tester.tap(find.text('Get started'));
+    await _settleDb(tester);
+    expect(find.text('READY TO FLY?'), findsOneWidget);
+    final prefs = await tester.runAsync(_db.readPrefs);
+    expect(prefs![AppSettings.keyBeepStyle], 'whistle');
+    await _finish(tester);
+  });
+
+  testWidgets('settings shows backup status and saves choices', (tester) async {
+    await _phone(tester);
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    expect(find.text('SETTINGS'), findsOneWidget);
+    expect(find.text('Never'), findsOneWidget);
+    expect(find.text('Export'), findsOneWidget);
+
+    await tester.tap(find.text('Low'));
+    await tester.tap(find.byType(SprintSwitch));
+    await _settleDb(tester);
+    final prefs = await tester.runAsync(_db.readPrefs);
+    expect(prefs![AppSettings.keyBeepStyle], 'low');
+    expect(prefs[AppSettings.keyAutoBackup], 'false');
+    expect(_player.previews, [BeepStyle.low]);
     await _finish(tester);
   });
 }

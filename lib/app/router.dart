@@ -6,6 +6,7 @@ import '../screens/builder_screen.dart';
 import '../screens/history_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/live_screen.dart';
+import '../screens/settings_screen.dart';
 import '../screens/summary_screen.dart';
 import '../timer/session_summary.dart';
 import 'theme.dart';
@@ -31,6 +32,15 @@ GoRouter buildRouter() => GoRouter(
               path: '/history',
               pageBuilder: (context, state) =>
                   _slide(state, const HistoryScreen()),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/settings',
+              pageBuilder: (context, state) =>
+                  _slide(state, const SettingsScreen()),
             ),
           ],
         ),
@@ -120,6 +130,11 @@ class TabShell extends StatelessWidget {
               NavigationDestination(
                 icon: Icon(Icons.bar_chart_rounded),
                 label: 'History',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.settings_outlined),
+                selectedIcon: Icon(Icons.settings_rounded),
+                label: 'Settings',
               ),
             ],
           ),

@@ -9,6 +9,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import '../app/providers.dart';
 import '../app/theme.dart';
 import '../audio/cue_player.dart';
+import '../data/settings.dart';
 import '../timer/keep_alive.dart';
 import '../timer/session_driver.dart';
 import '../timer/session_engine.dart';
@@ -46,7 +47,9 @@ class _LiveScreenState extends ConsumerState<LiveScreen>
   @override
   void initState() {
     super.initState();
-    _player = ref.read(cuePlayerProvider);
+    _player = ref.read(
+      cuePlayerProvider,
+    )..style = ref.read(settingsProvider).value?.beepStyle ?? BeepStyle.classic;
     _driver = SessionDriver(
       workout: ref.read(workoutProvider),
       onCue: _player.play,

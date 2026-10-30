@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_soloud/flutter_soloud.dart';
 
+import '../data/settings.dart';
 import '../timer/session_engine.dart';
 
 /// Plays the beep and haptic for each [Cue].
@@ -16,6 +17,11 @@ import '../timer/session_engine.dart';
 class CuePlayer {
   final Map<Cue, AudioSource> _sources = {};
   bool muted = false;
+  bool _open = false;
+  Future<void> _previewing = Future.value();
+
+  /// Applies from the next [open].
+  BeepStyle style = BeepStyle.classic;
 
   static const _tones = <Cue, _Tone>{
     Cue.countdown: _Tone(660, 120),
@@ -32,14 +38,40 @@ class CuePlayer {
 
   Future<void> open() async {
     final soloud = SoLoud.instance;
+    await _previewing;
     if (!soloud.isInitialized) await soloud.init();
+    _open = true;
     _sources.clear();
     for (final entry in _tones.entries) {
       _sources[entry.key] = await soloud.loadMem(
-        'cue-${entry.key.name}.wav',
-        entry.value.toWav(),
+        'cue-${style.name}-${entry.key.name}.wav',
+        entry.value.toWav(style),
       );
     }
+  }
+
+  /// Plays the go beep in [preview] style outside a session, starting the
+  /// engine just for it. Taps in quick succession play one after another.
+  Future<void> preview(BeepStyle preview) {
+    return _previewing = _previewing.then((_) async {
+      if (_open) return;
+      final soloud = SoLoud.instance;
+      try {
+        if (!soloud.isInitialized) await soloud.init();
+        final tone = _tones[Cue.go]!;
+        final source = await soloud.loadMem(
+          'preview-${preview.name}.wav',
+          tone.toWav(preview),
+        );
+        soloud.play(source);
+        HapticFeedback.heavyImpact();
+        await Future<void>.delayed(Duration(milliseconds: tone.ms + 80));
+      } catch (e) {
+        debugPrint('Beep preview failed: $e');
+      } finally {
+        if (!_open && soloud.isInitialized) soloud.deinit();
+      }
+    });
   }
 
   void play(Cue cue) {
@@ -67,6 +99,7 @@ class CuePlayer {
   }
 
   Future<void> close() async {
+    _open = false;
     _sources.clear();
     final soloud = SoLoud.instance;
     // deinit frees every loaded source along with the engine.
@@ -82,10 +115,11 @@ class _Tone {
 
   static const _rate = 44100;
 
-  /// 16-bit mono PCM WAV: a sine with a little third harmonic so it cuts
-  /// through wind and traffic, with a 4 ms attack and an exponential tail so
-  /// it does not click.
-  Uint8List toWav() {
+  /// 16-bit mono PCM WAV with a 4 ms attack and an exponential tail so it
+  /// does not click. Classic is a sine with a little third harmonic so it
+  /// cuts through wind and traffic; whistle is a higher pure tone with a
+  /// slight warble; low is an octave down and rounder, easier on the ears.
+  Uint8List toWav(BeepStyle style) {
     final n = _rate * ms ~/ 1000;
     final data = ByteData(44 + n * 2);
     void ascii(int offset, String s) {
@@ -111,9 +145,16 @@ class _Tone {
     const attack = _rate * 4 ~/ 1000;
     for (var i = 0; i < n; i++) {
       final t = i / _rate;
-      final wave = sin(2 * pi * hz * t) + 0.3 * sin(2 * pi * hz * 3 * t);
+      final wave = switch (style) {
+        BeepStyle.classic =>
+          (sin(2 * pi * hz * t) + 0.3 * sin(2 * pi * hz * 3 * t)) / 1.3,
+        BeepStyle.whistle => sin(
+          2 * pi * hz * 1.5 * t + 0.8 * sin(2 * pi * 7 * t),
+        ),
+        BeepStyle.low => (sin(pi * hz * t) + 0.5 * sin(2 * pi * hz * t)) / 1.5,
+      };
       final env = i < attack ? i / attack : exp(-3.0 * (i - attack) / n);
-      final sample = (wave / 1.3 * env * 0.9 * 32767).round();
+      final sample = (wave * env * 0.9 * 32767).round();
       data.setInt16(44 + i * 2, sample, Endian.little);
     }
     return data.buffer.asUint8List();

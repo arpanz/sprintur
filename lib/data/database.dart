@@ -64,6 +64,15 @@ class Reps extends Table {
   Set<Column> get primaryKey => {sessionId, rep};
 }
 
+/// App settings as key-value strings, typed by [AppSettings].
+class Prefs extends Table {
+  TextColumn get key => text()();
+  TextColumn get value => text()();
+
+  @override
+  Set<Column> get primaryKey => {key};
+}
+
 /// A finished session as stored, with its reps.
 class StoredSession {
   const StoredSession({required this.id, required this.summary, this.rpe});
@@ -73,16 +82,19 @@ class StoredSession {
   final int? rpe;
 }
 
-@DriftDatabase(tables: [SavedWorkouts, Sessions, Reps])
+@DriftDatabase(tables: [SavedWorkouts, Sessions, Reps, Prefs])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor])
     : super(executor ?? driftDatabase(name: 'sprintur'));
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+    onUpgrade: (m, from, to) async {
+      if (from < 2) await m.createTable(prefs);
+    },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
     },
@@ -173,6 +185,20 @@ class AppDatabase extends _$AppDatabase {
       ];
     });
   }
+
+  // Settings
+
+  Stream<Map<String, String>> watchPrefs() => select(
+    prefs,
+  ).watch().map((rows) => {for (final r in rows) r.key: r.value});
+
+  Future<Map<String, String>> readPrefs() => watchPrefs().first;
+
+  Future<void> setPref(String key, String? value) => value == null
+      ? (delete(prefs)..where((p) => p.key.equals(key))).go()
+      : into(
+          prefs,
+        ).insertOnConflictUpdate(PrefsCompanion.insert(key: key, value: value));
 
   // Saved workouts
 

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../audio/cue_player.dart';
 import '../data/database.dart';
+import '../data/settings.dart';
 import '../timer/workout.dart';
 
 /// Overridden in main with the real player, and in tests with a silent one.
@@ -18,6 +19,10 @@ final databaseProvider = Provider<AppDatabase>((ref) {
 
 final sessionsProvider = StreamProvider<List<StoredSession>>(
   (ref) => ref.watch(databaseProvider).watchSessions(),
+);
+
+final settingsProvider = StreamProvider<AppSettings>(
+  (ref) => ref.watch(databaseProvider).watchPrefs().map(AppSettings.fromPrefs),
 );
 
 final savedWorkoutsProvider = StreamProvider<List<(String, Workout)>>(
