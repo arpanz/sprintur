@@ -47,6 +47,18 @@ On iOS, the widgets and the lock screen view need a signing team in Xcode
 so the app and the widget extension can share the
 `group.com.livinlabs.sprintur` app group.
 
+## Releases
+
+CI runs the analyzer, the tests, and Android and iOS builds on every push.
+Pushing a tag such as `v1.1.0` builds a signed APK and AAB and publishes them
+as a GitHub release; the app's update check reads that release.
+
+Release builds need an upload keystore in these repository secrets:
+`SPRINTUR_KEYSTORE_BASE64` (the `.jks` file, base64), `SPRINTUR_KEYSTORE_PASSWORD`,
+`SPRINTUR_KEY_ALIAS` and `SPRINTUR_KEY_PASSWORD`. Locally, put the same values
+in `android/key.properties` (`storeFile`, `storePassword`, `keyAlias`,
+`keyPassword`); it is ignored by git.
+
 ## Network use
 
 The only network call is a daily check of this repository's latest GitHub
