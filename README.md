@@ -1,17 +1,58 @@
-# sprintur
+# Sprintur
 
-A new Flutter project.
+An open source sprint timer. Running apps track distance with GPS, but a
+30 m sprint is over before GPS settles. Sprintur works from a distance you
+measure out with cones: it beeps the start, beeps each split at your target
+pace, times the rep, and runs your rest.
 
-## Getting Started
+No account and no server. Everything stays on the phone, with backups to a
+file you control.
 
-This project is a starting point for a Flutter application.
+## Features
 
-A few resources to get you started if this is your first Flutter project:
+- Timed reps with a target time, rest, and split beeps at each cone
+- Marks, set, and a random go to train reaction, with false start detection
+- Auto finish on the target beep, or a partner taps the finish line
+- Keeps running with the screen off, and plays over your music
+- History, personal bests, weekly totals, and effort ratings
+- JSON backup and restore that merges by id, weekly auto backup, CSV export
+- Training reminders and new personal best alerts
+- Home screen widgets on Android and iOS, and the live session on the iOS
+  lock screen
+- Three beep sounds
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Build
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Requires Flutter 3.44 or later.
+
+```bash
+flutter pub get
+flutter run
+```
+
+No keys or config to set up. After changing the database tables, regenerate
+the drift code:
+
+```bash
+dart run build_runner build
+```
+
+Tests:
+
+```bash
+flutter test
+```
+
+On iOS, the widgets and the lock screen view need a signing team in Xcode
+so the app and the widget extension can share the
+`group.com.livinlabs.sprintur` app group.
+
+## Network use
+
+The only network call is a daily check of this repository's latest GitHub
+release, so the app can say when an update is out. Settings can turn it off.
+
+## License
+
+MIT. Barlow Condensed is under the SIL Open Font License
+(`assets/fonts/OFL.txt`).
