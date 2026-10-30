@@ -38,7 +38,7 @@ class Notifications {
     try {
       await _plugin.initialize(
         settings: const InitializationSettings(
-          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+          android: AndroidInitializationSettings('ic_notification'),
           // Asked for when the user turns reminders on, not at launch.
           iOS: DarwinInitializationSettings(
             requestAlertPermission: false,

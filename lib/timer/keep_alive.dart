@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' show Color;
 
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
@@ -67,6 +68,10 @@ class SessionKeepAlive {
           serviceTypes: [ForegroundServiceTypes.mediaPlayback],
           notificationTitle: title,
           notificationText: text,
+          notificationIcon: const NotificationIcon(
+            metaDataName: 'com.livinlabs.sprintur.NOTIFICATION_ICON',
+            backgroundColor: Color(0xFFD4FF3A),
+          ),
         );
         _lastText = '$title|$text';
       }

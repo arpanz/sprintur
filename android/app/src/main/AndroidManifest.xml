@@ -35,6 +35,10 @@
                 <action android:name="es.antonborri.home_widget.action.LAUNCH" />
             </intent-filter>
         </activity>
+        <!-- Status bar icon for the running-session notification. -->
+        <meta-data
+            android:name="com.livinlabs.sprintur.NOTIFICATION_ICON"
+            android:resource="@drawable/ic_notification" />
         <!-- Session keep-alive service. The name is fixed by flutter_foreground_task. -->
         <service
             android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
