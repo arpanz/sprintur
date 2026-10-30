@@ -6,6 +6,38 @@ import '../app/theme.dart';
 String formatRest(int seconds) =>
     '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
 
+const _months = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+const weekdayNames = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+];
+
+/// `30 Oct`
+String formatDay(DateTime at) => '${at.day} ${_months[at.month - 1]}';
+
+/// `18:05`
+String formatClock(DateTime at) =>
+    '${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}';
+
 String formatDelta(double delta) =>
     '${delta <= 0 ? '−' : '+'}${delta.abs().toStringAsFixed(2)}';
 

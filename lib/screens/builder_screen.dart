@@ -50,7 +50,15 @@ class BuilderScreen extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 44),
+                  TextButton(
+                    onPressed: () => _save(context, ref, w),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(44, 44),
+                      backgroundColor: SprintColors.surface,
+                      shape: const StadiumBorder(),
+                    ),
+                    child: const Text('Save'),
+                  ),
                 ],
               ),
             ),
@@ -224,6 +232,84 @@ class BuilderScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+Future<void> _save(BuildContext context, WidgetRef ref, Workout w) async {
+  final name = await showDialog<String>(
+    context: context,
+    builder: (context) => _NameDialog(initial: w.name),
+  );
+  if (name == null || name.trim().isEmpty) return;
+  final named = w.copyWith(name: name.trim());
+  await ref.read(databaseProvider).saveWorkout(named);
+  ref.read(workoutProvider.notifier).set(named);
+  if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: SprintColors.surface2,
+        behavior: SnackBarBehavior.floating,
+        content: Text(
+          'Saved "${named.name}" to Quick start',
+          style: const TextStyle(color: SprintColors.text),
+        ),
+      ),
+    );
+  }
+}
+
+class _NameDialog extends StatefulWidget {
+  const _NameDialog({required this.initial});
+
+  final String initial;
+
+  @override
+  State<_NameDialog> createState() => _NameDialogState();
+}
+
+class _NameDialogState extends State<_NameDialog> {
+  late final _controller = TextEditingController(text: widget.initial)
+    ..selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: widget.initial.length,
+    );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    void submit() => Navigator.of(context).pop(_controller.text);
+    return AlertDialog(
+      title: const Text('Save workout'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        maxLength: 40,
+        textCapitalization: TextCapitalization.sentences,
+        cursorColor: SprintColors.lime,
+        decoration: const InputDecoration(
+          labelText: 'Name',
+          focusedBorder: UnderlineInputBorder(
+            borderSide: BorderSide(color: SprintColors.lime),
+          ),
+        ),
+        onSubmitted: (_) => submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text(
+            'Cancel',
+            style: TextStyle(color: SprintColors.textSoft),
+          ),
+        ),
+        TextButton(onPressed: submit, child: const Text('Save')),
+      ],
     );
   }
 }

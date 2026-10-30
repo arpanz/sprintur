@@ -6,18 +6,18 @@ import 'app/providers.dart';
 import 'app/router.dart';
 import 'app/theme.dart';
 import 'audio/cue_player.dart';
+import 'timer/keep_alive.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
-  final player = CuePlayer();
   try {
-    await player.init();
+    await SessionKeepAlive.configure();
   } catch (e) {
-    // The timer is still usable on haptics alone.
-    debugPrint('Audio init failed, running without beeps: $e');
+    debugPrint('Audio session setup failed: $e');
   }
+  final player = CuePlayer();
 
   runApp(
     ProviderScope(
@@ -27,8 +27,21 @@ Future<void> main() async {
   );
 }
 
-class SprinturApp extends StatelessWidget {
+class SprinturApp extends StatefulWidget {
   const SprinturApp({super.key});
+
+  @override
+  State<SprinturApp> createState() => _SprinturAppState();
+}
+
+class _SprinturAppState extends State<SprinturApp> {
+  final _router = buildRouter();
+
+  @override
+  void dispose() {
+    _router.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +49,7 @@ class SprinturApp extends StatelessWidget {
       title: 'Sprintur',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
-      routerConfig: router,
+      routerConfig: _router,
     );
   }
 }

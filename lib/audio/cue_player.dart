@@ -8,9 +8,11 @@ import '../timer/session_engine.dart';
 
 /// Plays the beep and haptic for each [Cue].
 ///
-/// Tones are synthesised once at [init] and kept in memory, so playing one is
+/// Tones are synthesised once at [open] and kept in memory, so playing one is
 /// a single call into the native mixer with no file or decode work on the
-/// timing path.
+/// timing path. The audio engine only runs between [open] and [close]: while
+/// it runs it streams silence, which on iOS keeps the app alive in the
+/// background, so it must not outlive a session.
 class CuePlayer {
   final Map<Cue, AudioSource> _sources = {};
   bool muted = false;
@@ -28,9 +30,10 @@ class CuePlayer {
     Cue.done: _Tone(990, 500),
   };
 
-  Future<void> init() async {
+  Future<void> open() async {
     final soloud = SoLoud.instance;
     if (!soloud.isInitialized) await soloud.init();
+    _sources.clear();
     for (final entry in _tones.entries) {
       _sources[entry.key] = await soloud.loadMem(
         'cue-${entry.key.name}.wav',
@@ -63,12 +66,11 @@ class CuePlayer {
     }
   }
 
-  Future<void> dispose() async {
-    final soloud = SoLoud.instance;
-    for (final source in _sources.values) {
-      await soloud.disposeSource(source);
-    }
+  Future<void> close() async {
     _sources.clear();
+    final soloud = SoLoud.instance;
+    // deinit frees every loaded source along with the engine.
+    if (soloud.isInitialized) soloud.deinit();
   }
 }
 

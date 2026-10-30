@@ -1,38 +1,89 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../app/providers.dart';
 import '../app/theme.dart';
 import '../timer/session_summary.dart';
 import '../widgets/common.dart';
 
-const _months = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
-
-class SummaryScreen extends StatelessWidget {
-  const SummaryScreen({super.key, required this.summary});
+/// Shows a session. A fresh one (no [sessionId]) is saved as soon as the
+/// screen opens, so nothing is lost if the app is closed here. One opened
+/// from History can be rated again or deleted.
+class SummaryScreen extends ConsumerStatefulWidget {
+  const SummaryScreen({
+    super.key,
+    required this.summary,
+    this.sessionId,
+    this.rpe,
+  });
 
   final SessionSummary summary;
+  final String? sessionId;
+  final int? rpe;
+
+  @override
+  ConsumerState<SummaryScreen> createState() => _SummaryScreenState();
+}
+
+class _SummaryScreenState extends ConsumerState<SummaryScreen> {
+  late final Future<String> _id;
+  int? _rpe;
+
+  bool get _fromHistory => widget.sessionId != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _rpe = widget.rpe;
+    _id = _fromHistory
+        ? Future.value(widget.sessionId)
+        : ref.read(databaseProvider).saveSession(widget.summary);
+  }
+
+  Future<void> _rate(int value) async {
+    final next = _rpe == value ? null : value;
+    setState(() => _rpe = next);
+    await ref.read(databaseProvider).setRpe(await _id, next);
+  }
+
+  Future<void> _delete() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete this session?'),
+        content: const Text('It is removed from your history and records.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: SprintColors.textSoft),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: SprintColors.orangeText),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await ref.read(databaseProvider).deleteSession(await _id);
+    if (mounted) context.pop();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final summary = widget.summary;
     final w = summary.workout;
     final at = summary.finishedAt;
-    final time =
-        '${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}';
     final hasTimes = summary.measured.isNotEmpty;
 
     final tiles = hasTimes
@@ -58,19 +109,36 @@ class SummaryScreen extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
                 children: [
-                  Text(
-                    '${at.day} ${_months[at.month - 1]} · $time',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: SprintColors.muted,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${formatDay(at)} · ${formatClock(at)}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: SprintColors.muted,
+                          ),
+                        ),
+                      ),
+                      if (_fromHistory)
+                        RoundIconButton(
+                          icon: Icons.delete_outline_rounded,
+                          tooltip: 'Delete session',
+                          onPressed: _delete,
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 6),
-                  Text('SESSION DONE', style: SprintText.display(44)),
+                  Text(
+                    _fromHistory ? w.name.toUpperCase() : 'SESSION DONE',
+                    style: SprintText.display(44),
+                  ),
                   const SizedBox(height: 6),
                   Text(
-                    '${w.name} · ${w.reps} × ${w.distanceM} m',
+                    _fromHistory
+                        ? '${summary.results.length} of ${w.reps} × ${w.distanceM} m'
+                        : '${w.name} · ${w.reps} × ${w.distanceM} m',
                     style: const TextStyle(
                       fontSize: 15,
                       color: SprintColors.textSoft,
@@ -106,16 +174,84 @@ class SummaryScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+                  const SizedBox(height: 20),
+                  _EffortPicker(value: _rpe, onPick: _rate),
                 ],
               ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-              child: BigButton(label: 'Done', onPressed: () => context.go('/')),
+              child: BigButton(
+                label: 'Done',
+                onPressed: () => _fromHistory ? context.pop() : context.go('/'),
+              ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _EffortPicker extends StatelessWidget {
+  const _EffortPicker({required this.value, required this.onPick});
+
+  final int? value;
+  final ValueChanged<int> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'How hard was it?',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            for (var n = 1; n <= 10; n++) ...[
+              if (n > 1) const SizedBox(width: 4),
+              Expanded(
+                child: Semantics(
+                  button: true,
+                  selected: value == n,
+                  label: 'Effort $n of 10',
+                  excludeSemantics: true,
+                  child: GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      onPick(n);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      height: 44,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: value == n
+                            ? SprintColors.text
+                            : SprintColors.surface,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$n',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: value == n
+                              ? SprintColors.bg
+                              : SprintColors.textSoft,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ],
     );
   }
 }
@@ -178,7 +314,9 @@ class _RepChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final target = summary.workout.targetS;
     final times = summary.measured;
-    final lo = times.reduce(min) * 0.85;
+    // Include the target so its line stays on the chart even when every
+    // rep missed it.
+    final lo = min(times.reduce(min), target) * 0.85;
     final hi = max(times.reduce(max), target) * 1.05;
     double h(double t) =>
         ((t - lo) / (hi - lo) * _plotHeight).clamp(4, _plotHeight);
@@ -226,11 +364,22 @@ class _RepChart extends StatelessWidget {
                         for (final (i, r) in results.indexed) ...[
                           if (i > 0) const SizedBox(width: 10),
                           Expanded(
-                            child: _Bar(
-                              index: i,
-                              timeS: r.timeS,
-                              height: r.timeS == null ? 4 : h(r.timeS!),
-                              onTarget: r.timeS != null && r.timeS! <= target,
+                            // Few reps should not turn into slabs.
+                            child: Align(
+                              alignment: Alignment.bottomCenter,
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 48),
+                                child: SizedBox(
+                                  width: double.infinity,
+                                  child: _Bar(
+                                    index: i,
+                                    timeS: r.timeS,
+                                    height: r.timeS == null ? 4 : h(r.timeS!),
+                                    onTarget:
+                                        r.timeS != null && r.timeS! <= target,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ],

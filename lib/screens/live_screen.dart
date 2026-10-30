@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +9,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import '../app/providers.dart';
 import '../app/theme.dart';
 import '../audio/cue_player.dart';
+import '../timer/keep_alive.dart';
 import '../timer/session_driver.dart';
 import '../timer/session_engine.dart';
 import '../timer/session_summary.dart';
@@ -36,6 +39,9 @@ class _LiveScreenState extends ConsumerState<LiveScreen>
   late final CuePlayer _player;
   late final SessionDriver _driver;
   late final Ticker _ticker;
+  late final Future<void> _audioReady;
+  final _keepAlive = SessionKeepAlive();
+  Timer? _notificationTimer;
 
   @override
   void initState() {
@@ -47,6 +53,47 @@ class _LiveScreenState extends ConsumerState<LiveScreen>
     )..addListener(_onPhase);
     _ticker = createTicker((_) => setState(() {}));
     WakelockPlus.enable();
+    _audioReady = _openAudio();
+    // Frames stop with the screen off, but timers keep running: refresh the
+    // ongoing notification once a second so the lock screen stays current.
+    _notificationTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) =>
+          _keepAlive.update(title: _notificationTitle, text: _notificationText),
+    );
+  }
+
+  Future<void> _openAudio() async {
+    await _keepAlive.start(title: _notificationTitle, text: _notificationText);
+    try {
+      await _player.open();
+    } catch (e) {
+      // The timer still works on haptics alone.
+      debugPrint('Audio engine failed to start, running without beeps: $e');
+    }
+  }
+
+  String get _notificationTitle {
+    final s = _driver.state;
+    final w = _driver.workout;
+    return s.phase == Phase.done
+        ? '${w.name} · done'
+        : '${w.name} · Rep ${s.rep} of ${w.reps}';
+  }
+
+  String get _notificationText {
+    final s = _driver.state;
+    final w = _driver.workout;
+    final left = (s.secondsLeft(_driver.now) ?? 0).ceil();
+    return switch (s.phase) {
+      Phase.ready => 'Ready to start',
+      Phase.leadIn => 'Starting in $left s',
+      Phase.marks => 'On your marks',
+      Phase.set => 'Set',
+      Phase.running => 'Running ${w.distanceM} m',
+      Phase.rest => 'Rest ${formatRest(left)} · next ${w.distanceM} m',
+      Phase.done => '${s.results.length} reps done',
+    };
   }
 
   /// The clock only needs repainting every frame while something is counting.
@@ -57,14 +104,21 @@ class _LiveScreenState extends ConsumerState<LiveScreen>
     };
     if (counting && !_ticker.isActive) _ticker.start();
     if (!counting && _ticker.isActive) _ticker.stop();
+    _keepAlive.update(title: _notificationTitle, text: _notificationText);
     setState(() {});
   }
 
   @override
   void dispose() {
+    _notificationTimer?.cancel();
     _ticker.dispose();
     _driver.dispose();
     WakelockPlus.disable();
+    // Engine first, then the audio session: iOS refuses to deactivate a
+    // session that still has audio running.
+    final player = _player;
+    final keepAlive = _keepAlive;
+    _audioReady.whenComplete(() => player.close().whenComplete(keepAlive.stop));
     super.dispose();
   }
 

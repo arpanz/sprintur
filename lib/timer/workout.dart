@@ -72,6 +72,30 @@ class Workout {
     );
   }
 
+  @override
+  bool operator ==(Object other) =>
+      other is Workout &&
+      other.name == name &&
+      other.reps == reps &&
+      other.distanceM == distanceM &&
+      other.targetS == targetS &&
+      other.restS == restS &&
+      other.splitEveryM == splitEveryM &&
+      other.startSignal == startSignal &&
+      other.finishMode == finishMode;
+
+  @override
+  int get hashCode => Object.hash(
+    name,
+    reps,
+    distanceM,
+    targetS,
+    restS,
+    splitEveryM,
+    startSignal,
+    finishMode,
+  );
+
   static const presets = [
     Workout(
       name: 'Acceleration',
