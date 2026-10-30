@@ -53,9 +53,11 @@ CI runs the analyzer, the tests, and Android and iOS builds on every push.
 Pushing a tag such as `v1.1.0` builds a signed APK and AAB and publishes them
 as a GitHub release; the app's update check reads that release.
 
-Release builds need an upload keystore in these repository secrets:
-`SPRINTUR_KEYSTORE_BASE64` (the `.jks` file, base64), `SPRINTUR_KEYSTORE_PASSWORD`,
-`SPRINTUR_KEY_ALIAS` and `SPRINTUR_KEY_PASSWORD`. Locally, put the same values
+Release builds need an upload keystore in two repository secrets:
+`SPRINTUR_KEYSTORE_BASE64` (the `.jks` file, base64) and
+`SPRINTUR_KEYSTORE_PASSWORD`. The key alias defaults to `sprintur` and its
+password to the store's; `SPRINTUR_KEY_ALIAS` and `SPRINTUR_KEY_PASSWORD`
+override them. Locally, put the same values
 in `android/key.properties` (`storeFile`, `storePassword`, `keyAlias`,
 `keyPassword`); it is ignored by git.
 

@@ -14,7 +14,7 @@ val keyProperties = Properties().apply {
     if (file.exists()) file.inputStream().use { load(it) }
 }
 fun signingValue(property: String, env: String): String? =
-    keyProperties.getProperty(property) ?: System.getenv(env)
+    (keyProperties.getProperty(property) ?: System.getenv(env))?.takeIf { it.isNotBlank() }
 val releaseStoreFile = signingValue("storeFile", "SPRINTUR_KEYSTORE_PATH")
 
 android {
@@ -41,9 +41,12 @@ android {
         if (releaseStoreFile != null) {
             create("release") {
                 storeFile = file(releaseStoreFile)
-                storePassword = signingValue("storePassword", "SPRINTUR_KEYSTORE_PASSWORD")
-                keyAlias = signingValue("keyAlias", "SPRINTUR_KEY_ALIAS")
-                keyPassword = signingValue("keyPassword", "SPRINTUR_KEY_PASSWORD")
+                val password = signingValue("storePassword", "SPRINTUR_KEYSTORE_PASSWORD")
+                storePassword = password
+                // A PKCS12 keystore has one password, so the key's defaults
+                // to the store's.
+                keyAlias = signingValue("keyAlias", "SPRINTUR_KEY_ALIAS") ?: "sprintur"
+                keyPassword = signingValue("keyPassword", "SPRINTUR_KEY_PASSWORD") ?: password
             }
         }
     }
