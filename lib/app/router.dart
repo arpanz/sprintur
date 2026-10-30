@@ -1,0 +1,94 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../screens/builder_screen.dart';
+import '../screens/home_screen.dart';
+import '../screens/live_screen.dart';
+import '../screens/summary_screen.dart';
+import '../timer/session_summary.dart';
+
+final router = GoRouter(
+  routes: [
+    GoRoute(
+      path: '/',
+      pageBuilder: (context, state) => _slide(state, const HomeScreen()),
+    ),
+    GoRoute(
+      path: '/builder',
+      pageBuilder: (context, state) => _slide(state, const BuilderScreen()),
+    ),
+    GoRoute(
+      path: '/live',
+      pageBuilder: (context, state) => _rise(state, const LiveScreen()),
+    ),
+    GoRoute(
+      path: '/summary',
+      redirect: (context, state) => state.extra is SessionSummary ? null : '/',
+      pageBuilder: (context, state) =>
+          _rise(state, SummaryScreen(summary: state.extra! as SessionSummary)),
+    ),
+  ],
+);
+
+const _duration = Duration(milliseconds: 320);
+
+/// Fade in while sliding 30 px from the right; the page underneath fades back.
+CustomTransitionPage<void> _slide(GoRouterState state, Widget child) {
+  return CustomTransitionPage(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: _duration,
+    reverseTransitionDuration: _duration,
+    transitionsBuilder: (context, animation, secondary, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+      );
+      final out = CurvedAnimation(
+        parent: secondary,
+        curve: Curves.easeOutCubic,
+      );
+      return FadeTransition(
+        opacity: Tween(begin: 1.0, end: 0.4).animate(out),
+        child: FadeTransition(
+          opacity: curved,
+          child: AnimatedBuilder(
+            animation: curved,
+            builder: (context, child) => Transform.translate(
+              offset: Offset(30 * (1 - curved.value), 0),
+              child: child,
+            ),
+            child: child,
+          ),
+        ),
+      );
+    },
+  );
+}
+
+/// The session screens rise from below, so starting a run feels like a mode.
+CustomTransitionPage<void> _rise(GoRouterState state, Widget child) {
+  return CustomTransitionPage(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: _duration,
+    reverseTransitionDuration: _duration,
+    transitionsBuilder: (context, animation, secondary, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: AnimatedBuilder(
+          animation: curved,
+          builder: (context, child) => Transform.translate(
+            offset: Offset(0, 60 * (1 - curved.value)),
+            child: child,
+          ),
+          child: child,
+        ),
+      );
+    },
+  );
+}
