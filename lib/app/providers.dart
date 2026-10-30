@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../audio/cue_player.dart';
+import 'notifications.dart';
 import '../data/database.dart';
 import '../data/settings.dart';
 import '../timer/workout.dart';
@@ -9,6 +10,9 @@ import '../timer/workout.dart';
 final cuePlayerProvider = Provider<CuePlayer>(
   (ref) => throw UnimplementedError('cuePlayerProvider must be overridden'),
 );
+
+/// Overridden in tests with one that shows nothing.
+final notificationsProvider = Provider<Notifications>((ref) => Notifications());
 
 /// Overridden in tests with an in-memory database.
 final databaseProvider = Provider<AppDatabase>((ref) {

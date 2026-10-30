@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_next_up">NEXT UP</string>
+    <string name="widget_start">Start</string>
+    <string name="widget_this_week">THIS WEEK</string>
+    <string name="widget_week_bars">Metres run each day this week</string>
+    <string name="widget_next_up_description">Your next workout, one tap to start</string>
+    <string name="widget_best_description">Your personal best at the next workout\'s distance</string>
+    <string name="widget_week_description">Metres and sessions this week</string>
+
+    <style name="WidgetDay">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">#9AA1AC</item>
+        <item name="android:textSize">10sp</item>
+    </style>
+</resources>

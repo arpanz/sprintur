@@ -63,3 +63,14 @@ Set<String> pbSessionIds(List<StoredSession> sessions) {
   }
   return ids;
 }
+
+/// The fastest time at [distanceM] across [sessions], or null if none.
+double? bestAt(Iterable<StoredSession> sessions, int distanceM) {
+  double? best;
+  for (final s in sessions) {
+    final t = s.summary.best;
+    if (t == null || s.summary.workout.distanceM != distanceM) continue;
+    if (best == null || t < best) best = t;
+  }
+  return best;
+}

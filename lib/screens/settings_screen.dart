@@ -108,18 +108,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 12),
+            _RemindersCard(settings: settings, onChanged: _setReminders),
+            const SizedBox(height: 12),
             SectionCard(
               padding: EdgeInsets.zero,
-              child: _Row(
-                title: 'Version',
-                trailing: Text(
-                  ref.watch(_versionProvider).value ?? '',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: SprintColors.muted,
-                    fontFeatures: [FontFeature.tabularFigures()],
+              child: Column(
+                children: [
+                  _Row(
+                    title: 'Check for updates',
+                    subtitle:
+                        'Once a day, from GitHub releases. The only time the '
+                        'app goes online.',
+                    trailing: SprintSwitch(
+                      label: 'Check for updates',
+                      value: settings.checkUpdates,
+                      onChanged: (v) =>
+                          db.setPref(AppSettings.keyCheckUpdates, '$v'),
+                    ),
                   ),
-                ),
+                  const _Divider(),
+                  _VersionRow(version: ref.watch(_versionProvider).value),
+                ],
               ),
             ),
             const SizedBox(height: 20),
@@ -137,6 +146,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  /// Turning the first day on asks for notification permission.
+  Future<void> _setReminders(Set<int> days, int minutes) async {
+    final db = ref.read(databaseProvider);
+    final before = ref.read(settingsProvider).value?.reminderDays ?? {};
+    if (before.isEmpty && days.isNotEmpty) {
+      final allowed = await ref.read(notificationsProvider).requestPermission();
+      if (!allowed) {
+        _toast(
+          'Notifications are off for Sprintur. Turn them on in system '
+          'settings to get reminders.',
+        );
+        return;
+      }
+    }
+    await db.setPref(AppSettings.keyReminderDays, AppSettings.encodeDays(days));
+    await db.setPref(AppSettings.keyReminderMinutes, '$minutes');
   }
 
   /// Anchors the share sheet on iPad; ignored on phones.
@@ -436,4 +463,110 @@ class _Divider extends StatelessWidget {
     endIndent: 16,
     color: SprintColors.border,
   );
+}
+
+class _VersionRow extends StatelessWidget {
+  const _VersionRow({required this.version});
+
+  final String? version;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Row(
+      title: 'Version',
+      trailing: Text(
+        version ?? '',
+        style: const TextStyle(
+          fontSize: 14,
+          color: SprintColors.muted,
+          fontFeatures: [FontFeature.tabularFigures()],
+        ),
+      ),
+    );
+  }
+}
+
+/// Weekday chips and a time. No days picked means no reminders.
+class _RemindersCard extends StatelessWidget {
+  const _RemindersCard({required this.settings, required this.onChanged});
+
+  final AppSettings settings;
+  final void Function(Set<int> days, int minutes) onChanged;
+
+  static const _letters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+  @override
+  Widget build(BuildContext context) {
+    final days = settings.reminderDays;
+    final minutes = settings.reminderMinutes;
+    final time = TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60);
+    return SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Training reminders',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      days.isEmpty
+                          ? 'Pick your sprint days'
+                          : 'With your next workout',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: SprintColors.muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () async {
+                  final picked = await showTimePicker(
+                    context: context,
+                    initialTime: time,
+                  );
+                  if (picked != null) {
+                    onChanged(days, picked.hour * 60 + picked.minute);
+                  }
+                },
+                icon: const Icon(Icons.schedule_rounded, size: 18),
+                label: Text(time.format(context)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              for (var day = 1; day <= 7; day++) ...[
+                if (day > 1) const SizedBox(width: 6),
+                Expanded(
+                  child: ChoiceChipButton(
+                    label: _letters[day - 1],
+                    selected: days.contains(day),
+                    onTap: () => onChanged(
+                      days.contains(day)
+                          ? ({...days}..remove(day))
+                          : {...days, day},
+                      minutes,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }

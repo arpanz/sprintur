@@ -2,6 +2,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sprintur/app/notifications.dart';
 import 'package:sprintur/app/providers.dart';
 import 'package:sprintur/app/theme.dart';
 import 'package:sprintur/audio/cue_player.dart';
@@ -26,17 +27,32 @@ class _SilentCuePlayer extends CuePlayer {
 
 late _SilentCuePlayer _player;
 
+class _SilentNotifications extends Notifications {
+  final personalBests = <(int, double)>[];
+
+  @override
+  Future<bool> requestPermission() async => true;
+
+  @override
+  Future<void> showPersonalBest(
+    int distanceM,
+    double timeS,
+    double gain,
+  ) async => personalBests.add((distanceM, timeS));
+}
+
 late AppDatabase _db;
 
 Widget _scope(Widget child) => ProviderScope(
   overrides: [
     cuePlayerProvider.overrideWithValue(_player),
     databaseProvider.overrideWithValue(_db),
+    notificationsProvider.overrideWithValue(_SilentNotifications()),
   ],
   child: child,
 );
 
-Widget _app() => _scope(const SprinturApp(autoBackup: false));
+Widget _app() => _scope(const SprinturApp(launchTasks: false));
 
 Future<void> _phone(WidgetTester tester) async {
   tester.view.physicalSize = const Size(1170, 2532);
@@ -133,7 +149,7 @@ void main() {
   ) async {
     await _phone(tester);
     await tester.pumpWidget(summaryOf([4.62, 4.48, 4.41]));
-    await tester.pumpAndSettle();
+    await _settleDb(tester);
     expect(find.text('4.41'), findsWidgets);
     expect(find.text('4.50'), findsOneWidget);
     expect(find.text('2/3'), findsOneWidget);
@@ -148,10 +164,22 @@ void main() {
     await _finish(tester);
   });
 
+  testWidgets('a faster session shows the new best', (tester) async {
+    await tester.runAsync(
+      () => _db.saveSession(_summary([4.6], at: DateTime(2026, 10, 1))),
+    );
+    await _phone(tester);
+    await tester.pumpWidget(summaryOf([4.62, 4.41]));
+    await _settleDb(tester);
+    expect(find.text('NEW 30 M BEST'), findsOneWidget);
+    expect(find.text('4.41 s · −0.19'), findsOneWidget);
+    await _finish(tester);
+  });
+
   testWidgets('summary explains missing times in auto mode', (tester) async {
     await _phone(tester);
     await tester.pumpWidget(summaryOf([null, null]));
-    await tester.pumpAndSettle();
+    await _settleDb(tester);
     expect(find.textContaining('partner taps the finish'), findsOneWidget);
     expect(find.text('60'), findsOneWidget);
     await _finish(tester);

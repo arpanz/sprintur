@@ -11,6 +11,7 @@ import '../app/theme.dart';
 import '../audio/cue_player.dart';
 import '../data/settings.dart';
 import '../timer/keep_alive.dart';
+import '../timer/live_activity.dart';
 import '../timer/session_driver.dart';
 import '../timer/session_engine.dart';
 import '../timer/session_summary.dart';
@@ -42,6 +43,7 @@ class _LiveScreenState extends ConsumerState<LiveScreen>
   late final Ticker _ticker;
   late final Future<void> _audioReady;
   final _keepAlive = SessionKeepAlive();
+  final _liveActivity = SessionLiveActivity();
   Timer? _notificationTimer;
 
   @override
@@ -108,6 +110,15 @@ class _LiveScreenState extends ConsumerState<LiveScreen>
     if (counting && !_ticker.isActive) _ticker.start();
     if (!counting && _ticker.isActive) _ticker.stop();
     _keepAlive.update(title: _notificationTitle, text: _notificationText);
+    _liveActivity.show(
+      _driver.workout,
+      SessionLiveActivity.stateOf(
+        _driver.workout,
+        _driver.state,
+        _driver.now,
+        DateTime.now(),
+      ),
+    );
     setState(() {});
   }
 
@@ -121,6 +132,7 @@ class _LiveScreenState extends ConsumerState<LiveScreen>
     // session that still has audio running.
     final player = _player;
     final keepAlive = _keepAlive;
+    _liveActivity.end();
     _audioReady.whenComplete(() => player.close().whenComplete(keepAlive.stop));
     super.dispose();
   }

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../app/providers.dart';
 import '../app/theme.dart';
+import '../data/stats.dart';
 import '../timer/session_summary.dart';
 import '../widgets/common.dart';
 
@@ -33,15 +34,37 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
   late final Future<String> _id;
   int? _rpe;
 
+  /// Seconds taken off the previous best, when this session set a new one.
+  double? _pbGain;
+
   bool get _fromHistory => widget.sessionId != null;
 
   @override
   void initState() {
     super.initState();
     _rpe = widget.rpe;
-    _id = _fromHistory
-        ? Future.value(widget.sessionId)
-        : ref.read(databaseProvider).saveSession(widget.summary);
+    _id = _fromHistory ? Future.value(widget.sessionId) : _save();
+  }
+
+  Future<String> _save() async {
+    final db = ref.read(databaseProvider);
+    final summary = widget.summary;
+    final before = await db.watchSessions().first;
+    final id = await db.saveSession(summary);
+    final time = summary.best;
+    final previous = bestAt(before, summary.workout.distanceM);
+    if (time != null && previous != null && time < previous) {
+      if (mounted) setState(() => _pbGain = previous - time);
+      // Finished with the screen off: tell them on the lock screen.
+      if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+        ref
+            .read(notificationsProvider)
+            .showPersonalBest(summary.workout.distanceM, time, previous - time);
+      } else {
+        HapticFeedback.heavyImpact();
+      }
+    }
+    return id;
   }
 
   Future<void> _rate(int value) async {
@@ -144,6 +167,21 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                       color: SprintColors.textSoft,
                     ),
                   ),
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment.topLeft,
+                    child: _pbGain == null
+                        ? const SizedBox(width: double.infinity)
+                        : Padding(
+                            padding: const EdgeInsets.only(top: 14),
+                            child: _PbBanner(
+                              distanceM: w.distanceM,
+                              timeS: summary.best!,
+                              gain: _pbGain!,
+                            ),
+                          ),
+                  ),
                   const SizedBox(height: 20),
                   Row(
                     children: [
@@ -188,6 +226,47 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PbBanner extends StatelessWidget {
+  const _PbBanner({
+    required this.distanceM,
+    required this.timeS,
+    required this.gain,
+  });
+
+  final int distanceM;
+  final double timeS;
+  final double gain;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 16, 12),
+      decoration: BoxDecoration(
+        color: SprintColors.lime,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.emoji_events_rounded, color: SprintColors.bg),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'NEW $distanceM M BEST',
+              style: SprintText.display(22, color: SprintColors.bg),
+            ),
+          ),
+          Text(
+            '${timeS.toStringAsFixed(2)} s · ${formatDelta(-gain)}',
+            style: SprintText.number(
+              15,
+            ).copyWith(color: SprintColors.bg, fontWeight: FontWeight.w700),
+          ),
+        ],
       ),
     );
   }

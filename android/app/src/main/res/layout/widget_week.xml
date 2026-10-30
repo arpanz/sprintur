@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:letterSpacing="0.12"
+        android:text="@string/widget_this_week"
+        android:textColor="#9AA1AC"
+        android:textSize="11sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/week_metres"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:fontFamily="sans-serif-condensed"
+        android:textColor="#F2F3F5"
+        android:textSize="30sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/week_note"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:textColor="#B4BAC4"
+        android:textSize="12sp" />
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <ImageView
+        android:id="@+id/week_bars"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:contentDescription="@string/widget_week_bars"
+        android:scaleType="fitXY" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:orientation="horizontal">
+        <TextView style="@style/WidgetDay" android:text="M" />
+        <TextView style="@style/WidgetDay" android:text="T" />
+        <TextView style="@style/WidgetDay" android:text="W" />
+        <TextView style="@style/WidgetDay" android:text="T" />
+        <TextView style="@style/WidgetDay" android:text="F" />
+        <TextView style="@style/WidgetDay" android:text="S" />
+        <TextView style="@style/WidgetDay" android:text="S" />
+    </LinearLayout>
+</LinearLayout>
